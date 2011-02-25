@@ -1,13 +1,13 @@
 MSImageMovieEncoder
 -------------------
 
-This class provides a simple way of generating a movie from a series of 'images' (CVPixelBufferRefs or CGContextRefs).  **It does NOT work in the simulator (lack of HW accelleration?).**
+This class provides a simple way of generating a movie from a series of 'images' (CVPixelBufferRefs or CGContextRefs).  **It does NOT work in the simulator (lack of HW acceleration?).**
 
 You will need to include the CoreGraphics, AVFoundation, CoreMedia and CoreVideo frameworks in your project.
 
 Simply implement the 3 status methods and 1 (ONE and only ONE) of the optional frame provider methods.
  
-Init a new instance of this class, set the delegate to wherever you've implemented the apropriate delegate methods and call -(void)startRequestingFrames.
+Init a new instance of this class, set the delegate to wherever you've implemented the appropriate delegate methods and call -(void)startRequestingFrames.
  
 Your frame provider method will be handed a pointer to either a CVPixelBufferRef or a CGContextRef (depending on which you've implemented).  Fill the bitmap or buffer and return a BOOL to say if you've filled it.
  
@@ -17,7 +17,7 @@ As soon as you return NO the movie encoding is finished and written to disk.
 Initialising the Encoder
 ------------------------
 
-Using the class method you can get an auto-released instance however I would recommend alloc init'ing it and releasing it when you recieve the call telling you it's done encoding in your delegate.  Just a bit neater.
+Using the class method you can get an auto-released instance however I would recommend alloc init'ing it and releasing it when you receive the call telling you it's done encoding in your delegate.  Just a bit neater.
 
 	-(id)initWithURL:(NSURL*)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration;
 
