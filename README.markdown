@@ -2,7 +2,9 @@ MSImageMovieEncoder
 -------------------
 
 This class provides a simple way of generating a movie from a series of 'images' (CVPixelBufferRefs or CGContextRefs).  **It does NOT work in the simulator (lack of HW accelleration?).**
- 
+
+You will need to include the CoreGraphics, AVFoundation, CoreMedia and CoreVideo frameworks in your project.
+
 Simply implement the 3 status methods and 1 (ONE and only ONE) of the optional frame provider methods.
  
 Init a new instance of this class, set the delegate to wherever you've implemented the apropriate delegate methods and call -(void)startRequestingFrames.
