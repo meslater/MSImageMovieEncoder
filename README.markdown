@@ -36,7 +36,7 @@ You need to pass 3 things:
 	
 Then you need to set the delegate.
 	
-	myMovieWriter.delegate = myClassWhichImplemetsTheProtocol;
+	myMovieWriter.frameDelegate = myClassWhichImplemetsTheProtocol;
 	
 Then call startRequestingFrames
 
