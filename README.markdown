@@ -20,11 +20,17 @@ Using the class method you can get an auto-released instance however I would rec
 	-(id)initWithURL:(NSURL*)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration;
 
 You need to pass 3 things:
+
 1. fURL is a fileURL.  No spaces
-	NSURL* videoLocation = [NSURL fileURLWithPath:vid];
+
+	NSURL* fURL = [NSURL fileURLWithPath:vid];
+
 2. fSize is the frame size ie. 640x480, 1280x720
+
 	CGSizeMake(1280, 720);
+
 3. fDuration is the length of each frame.  This is a constant.  The asset writer starts doing very strange things if you ess with frame timings.  That's why the property is readonly.
+
 	CMTimeMake(1, 30); //30fps
 	CMTimeMake(1, 25); //25fps
 	
