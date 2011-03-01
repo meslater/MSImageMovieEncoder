@@ -37,7 +37,7 @@ CGColorSpaceRef rgbColorSpace; //if we're making bitmapContexts keep this for th
 	if ([super init] == self) {
 		self.frameSize = fSize;
 		frameDuration = fDuration;
-		fileURL = fURL;
+		fileURL = [fURL retain];
 		[self initialiseWriterWithURL:self.fileURL];
 	}
 	return self;
