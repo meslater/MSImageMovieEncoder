@@ -34,7 +34,7 @@ CGColorSpaceRef rgbColorSpace; //if we're making bitmapContexts keep this for th
 }
 
 -(id)initWithURL:(NSURL *)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration {
-	if ([super init] == self) {
+	if (self = [super init]) {
 		self.frameSize = fSize;
 		frameDuration = fDuration;
 		fileURL = [fURL retain];
@@ -225,12 +225,10 @@ CGColorSpaceRef rgbColorSpace; //if we're making bitmapContexts keep this for th
 	return pixelBuffer;
 }
 
-
-
-
-
 -(void)dealloc {
-	CGColorSpaceRelease(rgbColorSpace);
+	if (rgbColorSpace) {
+		CGColorSpaceRelease(rgbColorSpace);
+	}
 	[assetWriter release];
 	[assetWriterInput release];
 	[pixelBufferAdaptor release];
