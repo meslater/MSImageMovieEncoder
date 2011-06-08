@@ -9,14 +9,7 @@
 #import <AVFoundation/AVFoundation.h>
 
 
-@interface MSImageMovieEncoder (Private) //methods and variables only needed internally
-CMTime currentTime; //the current frame timing
-AVAssetWriter* assetWriter;
-AVAssetWriterInput* assetWriterInput;
-AVAssetWriterInputPixelBufferAdaptor* pixelBufferAdaptor;
-MovieEncoderMode mode;
-CGColorSpaceRef rgbColorSpace; //if we're making bitmapContexts keep this for the duration
-
+@interface MSImageMovieEncoder (Private) //methods only needed internally
 -(void)initialiseWriterWithURL:(NSURL*)videoLocation;
 -(CVPixelBufferRef)requestFrameFromDelegate;
 -(void)encodeAndWriteToDisk;
@@ -26,6 +19,10 @@ CGColorSpaceRef rgbColorSpace; //if we're making bitmapContexts keep this for th
 
 @synthesize frameSize, frameDuration, frameDelegate, fileURL;
 
++(BOOL)requiredHardwarePresent {
+    //I am still working out the best way to do this, for now we just return YES (completely useless!)
+    return YES;
+}
 
 /** Initialise an auto-released movie encoder */
 +(id)pixelBufferMovieEncoderWithURL:(NSURL *)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration {
@@ -34,7 +31,7 @@ CGColorSpaceRef rgbColorSpace; //if we're making bitmapContexts keep this for th
 }
 
 -(id)initWithURL:(NSURL *)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration {
-	if (self = [super init]) {
+	if ((self = [super init])) {
 		self.frameSize = fSize;
 		frameDuration = fDuration;
 		fileURL = [fURL retain];

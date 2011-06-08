@@ -103,12 +103,25 @@ typedef enum {
  ie. CGContextSetRGBFillColor(context, 0,0,1.0,0.5); is 100% red with a 50% alpha.
 
  For this slight annoyance of backwards colour declaration you get a 7x performance increase. */
+
+@class AVAssetWriter, AVAssetWriterInput, AVAssetWriterInputPixelBufferAdaptor;
+
 @interface MSImageMovieEncoder : NSObject {
 	CMTime frameDuration; /**< The duration of each frame (constant) */
 	CGSize frameSize;
 	NSURL* fileURL;
 	id<MSImageMovieEncoderFrameProvider> frameDelegate;
+    
+    @private
+    CMTime currentTime; //the current frame timing
+    AVAssetWriter* assetWriter;
+    AVAssetWriterInput* assetWriterInput;
+    AVAssetWriterInputPixelBufferAdaptor* pixelBufferAdaptor;
+    MovieEncoderMode mode;
+    CGColorSpaceRef rgbColorSpace; //if we're making bitmapContexts keep this for the duration
 }
+
++(BOOL)requiredHardwarePresent;
 
 /** fURL MUST be a fileURL, fSize is the video frame size and the size of teh buffers you will be handed (ie CGSizeMake(1280,720), fDuration is the length of each frame */
 +(id)pixelBufferMovieEncoderWithURL:(NSURL*)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration;
