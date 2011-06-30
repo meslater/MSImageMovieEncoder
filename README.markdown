@@ -1,9 +1,9 @@
 MSImageMovieEncoder
 -------------------
 
-This class provides a simple way of generating a movie from a series of 'images' (CVPixelBufferRefs or CGContextRefs).  **It does NOT work in the simulator (lack of HW acceleration?).**
+This class provides a simple way of generating a movie from a series of 'images' (CVPixelBufferRefs or CGContextRefs).
 
-You will need to include the CoreGraphics, AVFoundation, CoreMedia and CoreVideo frameworks in your project.
+You will need to include the CoreGraphics, AVFoundation, CoreMedia and CoreVideo frameworks in your project.  Remember to weak link (called 'optional' now) AVFoundation, CoreMedia and CoreVideo if you are supporting 3.x devices.  Call the class method +(BOOL)deviceSupportsVideoEncoding to determine if this class will work at all.  It checks both the availability of the appropriate classes and of the required hardware (by way of checking available presets).
 
 Simply implement the 3 status methods and 1 (ONE and only ONE) of the optional frame provider methods.
  
@@ -17,7 +17,7 @@ As soon as you return NO the movie encoding is finished and written to disk.
 Initialising the Encoder
 ------------------------
 
-Using the class method you can get an auto-released instance however I would recommend alloc init'ing it and releasing it when you receive the call telling you it's done encoding in your delegate.  Just a bit neater.
+Using the class method you can get an auto-released instance however I would recommend alloc init'ing it and releasing it when you receive the call telling you it's done encoding in your delegate.  Just a bit neater.  Remember to check if video encoding is available on the device first with +(BOOL)deviceSupportsVideoEncoding.  No further checks will be done by the class, it'll just crash and burn.
 
 	-(id)initWithURL:(NSURL*)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration;
 
@@ -27,7 +27,7 @@ You need to pass 3 things:
 
 	NSURL* fURL = [NSURL fileURLWithPath:vid];
 
-2. fSize is the frame size ie. 640x480, 1280x720
+2. fSize is the frame size ie. 640x480, 1280x720 - Use +(CGSize)maximumFrameSize to get the maximum resolution the device is capable of encoding.
 
 	CGSizeMake(1280, 720);
 

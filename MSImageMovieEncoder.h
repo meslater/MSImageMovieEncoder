@@ -121,7 +121,8 @@ typedef enum {
     CGColorSpaceRef rgbColorSpace; //if we're making bitmapContexts keep this for the duration
 }
 
-+(BOOL)requiredHardwarePresent;
++(BOOL)deviceSupportsVideoEncoding;
++(CGSize)maximumFrameSize;
 
 /** fURL MUST be a fileURL, fSize is the video frame size and the size of teh buffers you will be handed (ie CGSizeMake(1280,720), fDuration is the length of each frame */
 +(id)pixelBufferMovieEncoderWithURL:(NSURL*)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration;

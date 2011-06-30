@@ -10,18 +10,64 @@
 
 
 @interface MSImageMovieEncoder (Private) //methods only needed internally
++(BOOL)softwareAvailable;
 -(void)initialiseWriterWithURL:(NSURL*)videoLocation;
 -(CVPixelBufferRef)requestFrameFromDelegate;
 -(void)encodeAndWriteToDisk;
 @end
 
+static BOOL checkedForFrameSize = NO;
+static CGSize maxFrameSize;
+
 @implementation MSImageMovieEncoder
 
 @synthesize frameSize, frameDuration, frameDelegate, fileURL;
 
-+(BOOL)requiredHardwarePresent {
-    //I am still working out the best way to do this, for now we just return YES (completely useless!)
-    return YES;
++(BOOL)softwareAvailable {
+    //if the required AV Foundation classes are not present we don't stand a chance.
+    Class assetWriter = NSClassFromString(@"AVAssetWriter");
+    return assetWriter == nil ? NO : YES;
+}
+
++(BOOL)deviceSupportsVideoEncoding {
+    if ([MSImageMovieEncoder softwareAvailable]) {
+        //If the maximum frame size is 0,0 then the required hardware is not present
+        return !CGSizeEqualToSize(CGSizeMake(0, 0), [MSImageMovieEncoder maximumFrameSize]);
+    }
+    return NO;
+}
+
++(CGSize)maximumFrameSize {
+    //If there is a better way of determining the max video resolution I'd love to know what it is...
+    //No point in doing this more than once so we remember the last result.
+    if (!checkedForFrameSize) {
+        int frameWidth = 0;
+        int frameHeight = 0;
+        if ([MSImageMovieEncoder softwareAvailable]) {
+            NSArray* availablePresents = [AVAssetExportSession allExportPresets];
+            NSString *regex = @"AVAssetExportPreset\\d+x\\d+";
+            for (NSString* preset in availablePresents) {
+                NSPredicate *pred = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", regex];
+                if ([pred evaluateWithObject:preset])
+                {
+                    //Chop the front off to leave just the resolution as text
+                    preset = [preset substringFromIndex:19];
+                    //split the res into height and width
+                    NSArray* heightAndWidth = [preset componentsSeparatedByString:@"x"];
+                    int testWidth = [[heightAndWidth objectAtIndex:0] intValue];
+                    if (testWidth > frameWidth) {
+                        frameWidth = testWidth;
+                        frameHeight = [[heightAndWidth objectAtIndex:1] intValue];
+                    }
+                }
+            }
+            NSLog(@"%@", availablePresents);
+            NSLog(@"%d, %d", frameWidth, frameHeight);
+        }
+        maxFrameSize = CGSizeMake(frameWidth, frameHeight);
+        checkedForFrameSize = YES;
+    }
+    return maxFrameSize;
 }
 
 /** Initialise an auto-released movie encoder */
