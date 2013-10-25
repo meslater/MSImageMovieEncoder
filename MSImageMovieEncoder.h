@@ -33,11 +33,10 @@
 
 @end
 
-typedef enum {
-	kMSMovieEncoderBGRCGBitmapContextModeMode,
-	kMSMovieEncoderCVPixelBufferMode
-} MovieEncoderMode;
-
+typedef NS_ENUM(NSInteger, MSMovieEncoderMode) {
+	MSMovieEncoderBGRCGBitmapContextModeMode,
+	MSMovieEncoderCVPixelBufferMode,
+};
 
 /** This class provides a simple way of generating a movie from a series of 'images' (CVPixelBufferRefs or CGContextRefs).
  
@@ -106,35 +105,21 @@ typedef enum {
 
 @class AVAssetWriter, AVAssetWriterInput, AVAssetWriterInputPixelBufferAdaptor;
 
-@interface MSImageMovieEncoder : NSObject {
-	CMTime frameDuration; /**< The duration of each frame (constant) */
-	CGSize frameSize;
-	NSURL* fileURL;
-	id<MSImageMovieEncoderFrameProvider> frameDelegate;
-    
-    @private
-    CMTime currentTime; //the current frame timing
-    AVAssetWriter* assetWriter;
-    AVAssetWriterInput* assetWriterInput;
-    AVAssetWriterInputPixelBufferAdaptor* pixelBufferAdaptor;
-    MovieEncoderMode mode;
-    CGColorSpaceRef rgbColorSpace; //if we're making bitmapContexts keep this for the duration
-}
+@interface MSImageMovieEncoder : NSObject
 
 +(BOOL)deviceSupportsVideoEncoding;
 +(CGSize)maximumFrameSize;
 
-/** fURL MUST be a fileURL, fSize is the video frame size and the size of teh buffers you will be handed (ie CGSizeMake(1280,720), fDuration is the length of each frame */
+/** fURL MUST be a fileURL, fSize is the video frame size and the size of the buffers you will be handed (ie CGSizeMake(1280,720), fDuration is the length of each frame */
 +(id)pixelBufferMovieEncoderWithURL:(NSURL*)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration;
 -(id)initWithURL:(NSURL*)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration;
-
 
 //call this after you have set the delgate.  Calling while the delegate is nil will have no effect
 -(void)startRequestingFrames;
 
-@property (readwrite, nonatomic) CGSize frameSize; /**< The size of the video frame (ie. 1280x720) */
-@property (readonly) CMTime frameDuration; /**< The required duration of each still image.  ie. CMTimeMake(1, 25) would be 1/25th of a second (PAL) */
-@property (readonly) NSURL* fileURL; /**< The fileURL of the video, readonly as it cannot me changed after the writer is initialised. */
-@property (assign) id<MSImageMovieEncoderFrameProvider> frameDelegate; /**< The delegate providing frames */
+@property (nonatomic, assign, readonly) CGSize frameSize; /**< The size of the video frame (ie. 1280x720) */
+@property (nonatomic, assign, readonly) CMTime frameDuration; /**< The required duration of each still image.  ie. CMTimeMake(1, 25) would be 1/25th of a second (PAL) */
+@property (nonatomic, strong, readonly) NSURL* fileURL; /**< The fileURL of the video, readonly as it cannot me changed after the writer is initialised. */
+@property (nonatomic, weak) id<MSImageMovieEncoderFrameProvider> frameDelegate; /**< The delegate providing frames */
 
 @end

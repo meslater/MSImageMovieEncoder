@@ -8,29 +8,34 @@
 #import <QuartzCore/QuartzCore.h>
 #import <AVFoundation/AVFoundation.h>
 
-
-@interface MSImageMovieEncoder (Private) //methods only needed internally
-+(BOOL)softwareAvailable;
--(void)initialiseWriterWithURL:(NSURL*)videoLocation;
--(CVPixelBufferRef)requestFrameFromDelegate;
--(void)encodeAndWriteToDisk;
-@end
-
 static BOOL checkedForFrameSize = NO;
 static CGSize maxFrameSize;
 
+@interface MSImageMovieEncoder ()
+
+@property (nonatomic, assign, readwrite) CGSize frameSize;
+@property (nonatomic, assign, readwrite) CMTime frameDuration;
+@property (nonatomic, strong, readwrite) NSURL* fileURL;
+
+@property (nonatomic, assign) CMTime currentTime; //the current frame timing
+@property (nonatomic, strong) AVAssetWriter* assetWriter;
+@property (nonatomic, strong) AVAssetWriterInput* assetWriterInput;
+@property (nonatomic, strong) AVAssetWriterInputPixelBufferAdaptor* pixelBufferAdaptor;
+@property (nonatomic, assign) MSMovieEncoderMode mode;
+@property (nonatomic, assign) CGColorSpaceRef rgbColorSpace; //if we're making bitmapContexts keep this for the duration
+
+@end
+
 @implementation MSImageMovieEncoder
 
-@synthesize frameSize, frameDuration, frameDelegate, fileURL;
-
-+(BOOL)softwareAvailable {
++(BOOL)_softwareAvailable {
     //if the required AV Foundation classes are not present we don't stand a chance.
     Class assetWriter = NSClassFromString(@"AVAssetWriter");
     return assetWriter == nil ? NO : YES;
 }
 
 +(BOOL)deviceSupportsVideoEncoding {
-    if ([MSImageMovieEncoder softwareAvailable]) {
+    if ([MSImageMovieEncoder _softwareAvailable]) {
         //If the maximum frame size is 0,0 then the required hardware is not present
         return !CGSizeEqualToSize(CGSizeMake(0, 0), [MSImageMovieEncoder maximumFrameSize]);
     }
@@ -43,7 +48,7 @@ static CGSize maxFrameSize;
     if (!checkedForFrameSize) {
         int frameWidth = 0;
         int frameHeight = 0;
-        if ([MSImageMovieEncoder softwareAvailable]) {
+        if ([MSImageMovieEncoder _softwareAvailable]) {
             NSArray* availablePresents = [AVAssetExportSession allExportPresets];
             NSString *regex = @"AVAssetExportPreset\\d+x\\d+";
             for (NSString* preset in availablePresents) {
@@ -51,9 +56,9 @@ static CGSize maxFrameSize;
                 if ([pred evaluateWithObject:preset])
                 {
                     //Chop the front off to leave just the resolution as text
-                    preset = [preset substringFromIndex:19];
+                    NSString *presetCut = [preset substringFromIndex:19];
                     //split the res into height and width
-                    NSArray* heightAndWidth = [preset componentsSeparatedByString:@"x"];
+                    NSArray* heightAndWidth = [presetCut componentsSeparatedByString:@"x"];
                     int testWidth = [[heightAndWidth objectAtIndex:0] intValue];
                     if (testWidth > frameWidth) {
                         frameWidth = testWidth;
@@ -72,26 +77,25 @@ static CGSize maxFrameSize;
 
 /** Initialise an auto-released movie encoder */
 +(id)pixelBufferMovieEncoderWithURL:(NSURL *)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration {
-	MSImageMovieEncoder* movieEncoder = [[MSImageMovieEncoder alloc] initWithURL:fURL andFrameSize:fSize andFrameDuration:fDuration];
-	return [movieEncoder autorelease];
+	return [[MSImageMovieEncoder alloc] initWithURL:fURL andFrameSize:fSize andFrameDuration:fDuration];
 }
 
 -(id)initWithURL:(NSURL *)fURL andFrameSize:(CGSize)fSize andFrameDuration:(CMTime)fDuration {
 	if ((self = [super init])) {
-		self.frameSize = fSize;
-		frameDuration = fDuration;
-		fileURL = [fURL retain];
-		[self initialiseWriterWithURL:self.fileURL];
+		_frameSize = fSize;
+		_frameDuration = fDuration;
+		_fileURL = fURL;
+		[self _initialiseWriterWithURL:self.fileURL];
 	}
 	return self;
 }
 
--(void)initialiseWriterWithURL:(NSURL*)videoLocation {
+-(void)_initialiseWriterWithURL:(NSURL*)videoLocation {
 	NSError *error = nil;
-	currentTime = kCMTimeZero; //set time to 0 when we begin
-	assetWriter = [[AVAssetWriter alloc] initWithURL:videoLocation
-											fileType:AVFileTypeAppleM4V
-											   error:&error];
+	self.currentTime = kCMTimeZero; //set time to 0 when we begin
+	self.assetWriter = [[AVAssetWriter alloc] initWithURL:videoLocation
+                                                 fileType:AVFileTypeAppleM4V
+                                                    error:&error];
 	
 	if(error) {
 		if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFailWithReason:)]) {
@@ -104,10 +108,10 @@ static CGSize maxFrameSize;
 								   [NSNumber numberWithFloat:self.frameSize.width], AVVideoWidthKey,
 								   [NSNumber numberWithInt:self.frameSize.height], AVVideoHeightKey,
 								   nil];
-	assetWriterInput = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeVideo outputSettings:videoSettings];
-	assetWriterInput.expectsMediaDataInRealTime = NO; //this is the default, here for clarity
+	self.assetWriterInput = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeVideo outputSettings:videoSettings];
+	self.assetWriterInput.expectsMediaDataInRealTime = NO; //this is the default, here for clarity
 	
-	[assetWriter addInput:assetWriterInput];
+	[_assetWriter addInput:_assetWriterInput];
 	
 	int local_bytesPerRow = self.frameSize.width * 4;
 	
@@ -122,8 +126,7 @@ static CGSize maxFrameSize;
 										//(CFAllocatorRef)kCFAllocatorSystemDefault, kCVPixelBufferMemoryAllocatorKey,
 										nil];
 	
-	pixelBufferAdaptor = [[AVAssetWriterInputPixelBufferAdaptor alloc] initWithAssetWriterInput:assetWriterInput sourcePixelBufferAttributes:pixelBufferOptions];
-	[pixelBufferOptions release];
+	self.pixelBufferAdaptor = [[AVAssetWriterInputPixelBufferAdaptor alloc] initWithAssetWriterInput:_assetWriterInput sourcePixelBufferAttributes:pixelBufferOptions];
 }
 
 /** This method starts the asset writer and sets the time to 0.  It then
@@ -135,11 +138,11 @@ static CGSize maxFrameSize;
 	if (self.frameDelegate != nil) {
 		if ([self.frameDelegate respondsToSelector:@selector(nextFrameInBGRCGBitmapContext:)]) {
 			//prevents us from creating a colour space every time we produce a bitmap context.
-			rgbColorSpace = CGColorSpaceCreateDeviceRGB();
-			mode = kMSMovieEncoderBGRCGBitmapContextModeMode;
+			self.rgbColorSpace = CGColorSpaceCreateDeviceRGB();
+			self.mode = MSMovieEncoderBGRCGBitmapContextModeMode;
 		}
 		else if ([self.frameDelegate respondsToSelector:@selector(nextFrameInCVPixelBuffer:)]) {
-			mode = kMSMovieEncoderCVPixelBufferMode;
+			self.mode = MSMovieEncoderCVPixelBufferMode;
 		}
 		//no use starting the whole thing up only to find the delegate doesn't exist.
 		//rather than checking before each frame (unnecessary), just check now that the delegate implements the appropriate method.
@@ -148,31 +151,31 @@ static CGSize maxFrameSize;
 		return;
 	}
 
-	[assetWriter startWriting];
-	[assetWriter startSessionAtSourceTime:kCMTimeZero];
+	[_assetWriter startWriting];
+	[_assetWriter startSessionAtSourceTime:kCMTimeZero];
 
 	dispatch_queue_t queue = dispatch_queue_create("mscvpixelbuffer.framerequestqueue", NULL);
-	[assetWriterInput requestMediaDataWhenReadyOnQueue:queue usingBlock:^{
-        while ([assetWriterInput isReadyForMoreMediaData])
+	[_assetWriterInput requestMediaDataWhenReadyOnQueue:queue usingBlock:^{
+        while ([_assetWriterInput isReadyForMoreMediaData])
         {
 			//this will always be a pixelbuffer regardless of what we actually got handed,
 			//requestFrameFromDelegate takes care of this for us.
-			CVPixelBufferRef nextPixelBuffer = [self requestFrameFromDelegate];
+			CVPixelBufferRef nextPixelBuffer = [self _requestFrameFromDelegate];
 			
             if (nextPixelBuffer)
             {
                 //if it can't be successfully appended let the delegate know and mark it as finished otherwise progress the time one frame
-				if (![pixelBufferAdaptor appendPixelBuffer:nextPixelBuffer withPresentationTime:currentTime]) {
+				if (![_pixelBufferAdaptor appendPixelBuffer:nextPixelBuffer withPresentationTime:_currentTime]) {
 					if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFailWithReason:)]) {
 						dispatch_async(dispatch_get_main_queue(), ^{ [self.frameDelegate movieEncoderDidFailWithReason:@"Bufer not appended successfully - Error compiling movie"]; });
 						
 					}
-					[assetWriterInput markAsFinished]; //since this one was unsuccessful we should bail... this prevents further calls from this block
-					[self encodeAndWriteToDisk];
+					[_assetWriterInput markAsFinished]; //since this one was unsuccessful we should bail... this prevents further calls from this block
+					[self _encodeAndWriteToDisk];
 				}
 				else {
 					//rather than notifying the delegate after every frame the operation can be assumed successful if you don't get a fail notification.
-					currentTime = CMTimeAdd(currentTime, frameDuration); //progress frame to the end of the current frame
+					self.currentTime = CMTimeAdd(_currentTime, _frameDuration); //progress frame to the end of the current frame
 				}
 				CVPixelBufferRelease(nextPixelBuffer);
 			}
@@ -182,33 +185,57 @@ static CGSize maxFrameSize;
 					dispatch_async(dispatch_get_main_queue(), ^{ [self.frameDelegate movieEncoderDidFinishAddingFrames]; });
 				}
 				//now we've added all of the frames we need to finish encoding and writing to disk
-				[self encodeAndWriteToDisk]; //this is blocking because it has the blocking finishWriting call in it. (doesn't matter)
+				[self _encodeAndWriteToDisk]; //this is blocking because it has the blocking finishWriting call in it. (doesn't matter)
                 break;
             }
         }
     }];
-	dispatch_release(queue);
 }
 
--(void)encodeAndWriteToDisk {
-	if (rgbColorSpace) {
-		CGColorSpaceRelease(rgbColorSpace);
-		rgbColorSpace = NULL;
+-(void)_encodeAndWriteToDisk {
+	if (_rgbColorSpace) {
+		CGColorSpaceRelease(_rgbColorSpace);
+		self.rgbColorSpace = NULL;
 	}
-	BOOL success = [assetWriter finishWriting];
-	if (!success) {
-		if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFailWithReason:)]) {
-			dispatch_async(dispatch_get_main_queue(), ^{ [self.frameDelegate movieEncoderDidFailWithReason:[NSString stringWithFormat:@"Asset Writer could not write asset, returned with error: \n%@", [assetWriter error]]]; });
-			
-		}
-	}
-	else {
-		if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFinishEncoding)]) {
-			dispatch_async(dispatch_get_main_queue(), ^{ [self.frameDelegate movieEncoderDidFinishEncoding]; });
-			
-		}
-	}
-
+    
+    void(^successBlock)() = ^() {
+        if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFinishEncoding)]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self.frameDelegate movieEncoderDidFinishEncoding];
+            });
+        }
+    };
+    
+    void(^failureBlock)() = ^() {
+        if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFailWithReason:)]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self.frameDelegate movieEncoderDidFailWithReason:[NSString stringWithFormat:@"Asset Writer could not write asset, returned with error: \n%@",
+                                                                   [_assetWriter error]]];
+            });
+            
+        }
+    };
+    
+    
+    if ([_assetWriter respondsToSelector:@selector(finishWritingWithCompletionHandler:)]) {
+        [_assetWriter finishWritingWithCompletionHandler:^{
+            if (_assetWriter.status != AVAssetWriterStatusFailed) {
+                successBlock();
+            } else {
+                failureBlock();
+            }
+        }];
+    } else {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        BOOL success = [_assetWriter finishWriting];
+        #pragma clang diagnostic pop
+        if (!success) {
+            failureBlock();
+        } else {
+            successBlock();
+        }
+    }
 }
 
 /** This method efficiently allocates a pixel buffer and requests that the delegate fill it.  It can also produce
@@ -217,22 +244,22 @@ static CGSize maxFrameSize;
  Because these buffers are being efficiently reused you MUST draw the entire frame (every pixel)
  each time to avoid unexpected and unpredictable bits of other frames appearing.  The buffers are not reallocted
  they are generally just reused and they are not wiped.  */
--(CVPixelBufferRef)requestFrameFromDelegate {
+-(CVPixelBufferRef)_requestFrameFromDelegate {
 	//here we simply return a CVPixelBuffer and it is stuck to the end of the asset using the adaptor...
 	//For maximum efficiency, you should create CVPixelBuffer objects for appendPixelBuffer:withPresentationTime: by using this pool with the CVPixelBufferPoolCreatePixelBuffer function.
 	
 	CVPixelBufferRef pixelBuffer = NULL;
-	OSStatus err = CVPixelBufferPoolCreatePixelBuffer (kCFAllocatorDefault, pixelBufferAdaptor.pixelBufferPool, &pixelBuffer);
+	OSStatus err = CVPixelBufferPoolCreatePixelBuffer (kCFAllocatorDefault, _pixelBufferAdaptor.pixelBufferPool, &pixelBuffer);
 	if (err) {
 		if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFailWithReason:)]) {
-			dispatch_async(dispatch_get_main_queue(), ^{ [self.frameDelegate movieEncoderDidFailWithReason:[NSString stringWithFormat:@"CVPixelBufferPoolCreatePixelBuffer() failed with error %i", err]]; });
+			dispatch_async(dispatch_get_main_queue(), ^{ [self.frameDelegate movieEncoderDidFailWithReason:[NSString stringWithFormat:@"CVPixelBufferPoolCreatePixelBuffer() failed with error %i", (int)err]]; });
 			
 		}
 	}
 	
 	BOOL success = NO;
-	switch (mode) {
-		case kMSMovieEncoderBGRCGBitmapContextModeMode: //make a bitmap context and get the delegate to draw in it
+	switch (_mode) {
+		case MSMovieEncoderBGRCGBitmapContextModeMode: //make a bitmap context and get the delegate to draw in it
 			if (pixelBuffer == NULL) {
 				break;
 			}
@@ -243,8 +270,8 @@ static CGSize maxFrameSize;
 				return NO;
 			}
 			
-			CGContextRef context = CGBitmapContextCreate(pxdata, frameSize.width,
-														 frameSize.height, 8, 4*frameSize.width, rgbColorSpace,
+			CGContextRef context = CGBitmapContextCreate(pxdata, _frameSize.width,
+														 _frameSize.height, 8, 4*_frameSize.width, _rgbColorSpace,
 														 kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
 			success = [self.frameDelegate nextFrameInBGRCGBitmapContext:&context];
 
@@ -252,7 +279,7 @@ static CGSize maxFrameSize;
 			
 			CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
 			break;
-		case kMSMovieEncoderCVPixelBufferMode: //just pass a reference to the pixel buffer for the delegate to do with it what it likes
+		case MSMovieEncoderCVPixelBufferMode: //just pass a reference to the pixel buffer for the delegate to do with it what it likes
 			success = [self.frameDelegate nextFrameInCVPixelBuffer:&pixelBuffer];
 			break;
 		default:
@@ -269,14 +296,9 @@ static CGSize maxFrameSize;
 }
 
 -(void)dealloc {
-	if (rgbColorSpace) {
-		CGColorSpaceRelease(rgbColorSpace);
+	if (_rgbColorSpace) {
+		CGColorSpaceRelease(_rgbColorSpace);
 	}
-	[assetWriter release];
-	[assetWriterInput release];
-	[pixelBufferAdaptor release];
-	[fileURL release];
-	[super dealloc];
 }
 
 @end
