@@ -7,13 +7,15 @@
 #import <Foundation/Foundation.h>
 #import <CoreMedia/CoreMedia.h>
 
+@class MSImageMovieEncoder;
+
 /** This protocol has 3 methods you must implement and a choice of 2 more, you must implement 1 of these optional methods for the class to function. */
 @protocol MSImageMovieEncoderFrameProvider <NSObject>
 
 //Information methods should all be implemented so you know what is going on.
--(void)movieEncoderDidFailWithReason:(NSString*)reason;
--(void)movieEncoderDidFinishAddingFrames;
--(void)movieEncoderDidFinishEncoding;
+-(void)movieEncoder:(MSImageMovieEncoder *)movieEncoder didFailWithReason:(NSString*)reason;
+-(void)movieEncoderDidFinishAddingFrames:(MSImageMovieEncoder *)movieEncoder;
+-(void)movieEncoderDidFinishEncoding:(MSImageMovieEncoder *)movieEncoder;
 
 @optional
 //Just implement one of these methods - we check when we start requesting frames which one you've implemented

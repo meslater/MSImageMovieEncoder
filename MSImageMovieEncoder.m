@@ -99,7 +99,7 @@ static CGSize maxFrameSize;
 	
 	if(error) {
 		if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFailWithReason:)]) {
-			[self.frameDelegate movieEncoderDidFailWithReason:[NSString stringWithFormat:@"Initialisation of movie encoder failed, assetWriter has error: %@", error]];
+			[self.frameDelegate movieEncoder:self didFailWithReason:[NSString stringWithFormat:@"Initialisation of movie encoder failed, assetWriter has error: %@", error]];
 		}
     }
 	
@@ -167,8 +167,9 @@ static CGSize maxFrameSize;
                 //if it can't be successfully appended let the delegate know and mark it as finished otherwise progress the time one frame
 				if (![_pixelBufferAdaptor appendPixelBuffer:nextPixelBuffer withPresentationTime:_currentTime]) {
 					if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFailWithReason:)]) {
-						dispatch_async(dispatch_get_main_queue(), ^{ [self.frameDelegate movieEncoderDidFailWithReason:@"Bufer not appended successfully - Error compiling movie"]; });
-						
+						dispatch_async(dispatch_get_main_queue(), ^{
+                            [self.frameDelegate movieEncoder:self didFailWithReason:@"Bufer not appended successfully - Error compiling movie"];
+                        });
 					}
 					[_assetWriterInput markAsFinished]; //since this one was unsuccessful we should bail... this prevents further calls from this block
 					[self _encodeAndWriteToDisk];
@@ -182,7 +183,9 @@ static CGSize maxFrameSize;
             else
             {
 				if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFinishAddingFrames)]) {
-					dispatch_async(dispatch_get_main_queue(), ^{ [self.frameDelegate movieEncoderDidFinishAddingFrames]; });
+					dispatch_async(dispatch_get_main_queue(), ^{
+                        [self.frameDelegate movieEncoderDidFinishAddingFrames:self];
+                    });
 				}
 				//now we've added all of the frames we need to finish encoding and writing to disk
 				[self _encodeAndWriteToDisk]; //this is blocking because it has the blocking finishWriting call in it. (doesn't matter)
@@ -201,7 +204,7 @@ static CGSize maxFrameSize;
     void(^successBlock)() = ^() {
         if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFinishEncoding)]) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                [self.frameDelegate movieEncoderDidFinishEncoding];
+                [self.frameDelegate movieEncoderDidFinishEncoding:self];
             });
         }
     };
@@ -209,7 +212,7 @@ static CGSize maxFrameSize;
     void(^failureBlock)() = ^() {
         if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFailWithReason:)]) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                [self.frameDelegate movieEncoderDidFailWithReason:[NSString stringWithFormat:@"Asset Writer could not write asset, returned with error: \n%@",
+                [self.frameDelegate movieEncoder:self didFailWithReason:[NSString stringWithFormat:@"Asset Writer could not write asset, returned with error: \n%@",
                                                                    [_assetWriter error]]];
             });
             
@@ -252,8 +255,9 @@ static CGSize maxFrameSize;
 	OSStatus err = CVPixelBufferPoolCreatePixelBuffer (kCFAllocatorDefault, _pixelBufferAdaptor.pixelBufferPool, &pixelBuffer);
 	if (err) {
 		if ([self.frameDelegate respondsToSelector:@selector(movieEncoderDidFailWithReason:)]) {
-			dispatch_async(dispatch_get_main_queue(), ^{ [self.frameDelegate movieEncoderDidFailWithReason:[NSString stringWithFormat:@"CVPixelBufferPoolCreatePixelBuffer() failed with error %i", (int)err]]; });
-			
+			dispatch_async(dispatch_get_main_queue(), ^{
+                [self.frameDelegate movieEncoder:self didFailWithReason:[NSString stringWithFormat:@"CVPixelBufferPoolCreatePixelBuffer() failed with error %i", (int)err]];
+            });
 		}
 	}
 	
